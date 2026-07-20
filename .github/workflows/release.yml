@@ -1,0 +1,25 @@
+name: release
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with: { node-version: 16, cache: npm }
+      - run: sudo xcode-select -s /Applications/Xcode_26.0.1.app/Contents/Developer
+      - run: npm ci
+      - run: set -o pipefail && xcodebuild -project alt-tab-macos.xcodeproj -scheme Release -derivedDataPath DerivedData CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual CODE_SIGNING_REQUIRED=NO DEVELOPMENT_TEAM= OTHER_CODE_SIGN_FLAGS= | scripts/xcbeautify
+      - name: zip
+        run: |
+          cd DerivedData/Build/Products/Release
+          ditto -c -k --keepParent AltTab.app "AltTab-${GITHUB_REF_NAME}.zip"
+      - uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: DerivedData/Build/Products/Release/*.zip

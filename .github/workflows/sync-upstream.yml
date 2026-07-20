@@ -1,0 +1,27 @@
+name: sync-upstream
+on:
+  schedule: [{ cron: '0 6 * * *' }]   # daily 06:00 UTC
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with: { fetch-depth: 0 }
+      - id: merge
+        run: |
+          git config user.name  github-actions
+          git config user.email github-actions@github.com
+          git remote add upstream https://github.com/lwouis/alt-tab-macos.git
+          git fetch upstream master --tags
+          before=$(git rev-parse HEAD)
+          git merge --no-edit upstream/master   # red job on conflict — resolve by hand
+          git push origin HEAD
+          if [ "$before" != "$(git rev-parse HEAD)" ]; then echo "changed=true" >> "$GITHUB_OUTPUT"; fi
+      - name: tag release
+        if: steps.merge.outputs.changed == 'true'
+        run: |
+          tag="v$(cat VERSION.txt 2>/dev/null || date +%Y.%m.%d-%H%M)"
+          git tag "$tag" && git push origin "$tag"   # pushing the tag triggers release.yml
